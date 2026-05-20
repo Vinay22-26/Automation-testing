@@ -12,16 +12,14 @@ const jobs = {};
 
 // POST /test — Spring Boot submits a URL to test
 app.post("/test", async (req, res) => {
-  const { url } = req.body;
+  const { url, username, password, categories, customInstruction } = req.body;
   if (!url) return res.status(400).json({ error: "URL is required" });
 
   const jobId = uuidv4();
   jobs[jobId] = { status: "queued", progress: [], result: null };
-
   res.json({ jobId, status: "queued" });
 
-  // Run async — don't await here so response returns immediately
-  runJob(jobId, url);
+  runJob(jobId, url, { username, password, categories, customInstruction });
 });
 
 // GET /test/:jobId — Spring Boot polls for progress & results
@@ -34,7 +32,7 @@ app.get("/test/:jobId", (req, res) => {
 // GET /health
 app.get("/health", (_, res) => res.json({ status: "ok" }));
 
-async function runJob(jobId, url) {
+async function runJob(jobId, url, options = {}) {
   const pushProgress = (message) => {
     jobs[jobId].progress.push({ time: new Date().toISOString(), message });
     console.log(`[${jobId}] ${message}`);
@@ -43,7 +41,7 @@ async function runJob(jobId, url) {
   try {
     jobs[jobId].status = "running";
     pushProgress(`Starting analysis of: ${url}`);
-    const result = await analyzeAndTest(url, pushProgress);
+    const result = await analyzeAndTest(url, pushProgress, options);
     jobs[jobId].status = "completed";
     jobs[jobId].result = result;
     pushProgress("All tests completed.");

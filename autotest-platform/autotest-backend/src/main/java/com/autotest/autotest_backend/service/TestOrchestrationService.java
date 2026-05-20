@@ -1,5 +1,7 @@
 package com.autotest.autotest_backend.service;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.scheduling.annotation.Async;
@@ -23,30 +25,35 @@ public class TestOrchestrationService {
     private final WebClient playwrightClient = WebClient.create("http://localhost:4000");
 
     // Runs in background thread — doesn't block Spring
-    @Async
-    public void startTest(String jobId, String url, String userId) {
-        try {
-            // Step 1 — Submit URL to Playwright microservice
-            progressNotifier.sendProgress(jobId, "Sending URL to testing engine...");
+   @Async
+public void startTest(String jobId, String url, String userId,
+                      String username, String password,
+                      List<String> categories, String customInstruction) {
+    try {
+        progressNotifier.sendProgress(jobId, "Sending URL to testing engine...");
 
-            Map response = playwrightClient.post()
-                .uri("/test")
-                .bodyValue(Map.of("url", url))
-                .retrieve()
-                .bodyToMono(Map.class)
-                .block();
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("url", url);
+        if (username != null && !username.isEmpty()) payload.put("username", username);
+        if (password != null && !password.isEmpty()) payload.put("password", password);
+        if (categories != null) payload.put("categories", categories);
+        if (customInstruction != null) payload.put("customInstruction", customInstruction);
 
-            String playwrightJobId = (String) response.get("jobId");
-            progressNotifier.sendProgress(jobId, "Engine started. Job ID: " + playwrightJobId);
+        Map response = playwrightClient.post()
+            .uri("/test")
+            .bodyValue(payload)
+            .retrieve()
+            .bodyToMono(Map.class)
+            .block();
 
-            // Step 2 — Poll Playwright microservice every 3 seconds
-            pollForResults(jobId, playwrightJobId, url, userId);
+        String playwrightJobId = (String) response.get("jobId");
+        progressNotifier.sendProgress(jobId, "Engine started. Job ID: " + playwrightJobId);
+        pollForResults(jobId, playwrightJobId, url, userId);
 
-        } catch (Exception e) {
-            log.error("Test failed for jobId {}: {}", jobId, e.getMessage());
-            progressNotifier.sendProgress(jobId, "ERROR: " + e.getMessage());
-        }
+    } catch (Exception e) {
+        progressNotifier.sendProgress(jobId, "ERROR: " + e.getMessage());
     }
+}
 
     private void pollForResults(String jobId, String playwrightJobId, String url, String userId) throws InterruptedException {
         int maxAttempts = 60; // max 3 minutes (60 x 3s)

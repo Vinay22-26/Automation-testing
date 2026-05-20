@@ -2,36 +2,54 @@
  * Stage 2 — Generates test cases based on what the page analyzer found.
  * Each test case is a structured object that the test runner can execute.
  */
-async function generateTestCases(pageData, pushProgress) {
+async function generateTestCases(pageData, pushProgress, options = {}) {
+  const { categories, customInstruction } = options;
   const cases = [];
 
-  switch (pageData.pageType) {
-    case "LOGIN":
-      pushProgress("Generating login test cases...");
-      cases.push(...loginTestCases(pageData));
-      break;
-    case "REGISTRATION":
-      pushProgress("Generating registration test cases...");
-      cases.push(...registrationTestCases(pageData));
-      break;
-    case "SEARCH":
-      pushProgress("Generating search test cases...");
-      cases.push(...searchTestCases(pageData));
-      break;
-    case "GENERIC_FORM":
-      pushProgress("Generating generic form test cases...");
-      cases.push(...genericFormTestCases(pageData));
-      break;
-    case "STATIC":
-      pushProgress("Generating static page test cases...");
-      cases.push(...staticPageTestCases(pageData));
-      break;
-    default:
-      cases.push(...genericFormTestCases(pageData));
+  // If user gave custom instructions, add those as a special test
+  if (customInstruction) {
+    pushProgress(`Adding custom instruction: "${customInstruction}"`);
+    cases.push({
+      id: "custom_instruction",
+      name: "Custom instruction test",
+      description: customInstruction,
+      category: "CUSTOM",
+      actions: [{ type: "CUSTOM_INSTRUCTION", instruction: customInstruction }],
+      expectation: "ANY_RESPONSE",
+    });
   }
 
-  // Always add universal tests regardless of page type
+  switch (pageData.pageType) {
+    case "LOGIN":    cases.push(...loginTestCases(pageData)); break;
+    case "REGISTRATION": cases.push(...registrationTestCases(pageData)); break;
+    case "SEARCH":   cases.push(...searchTestCases(pageData)); break;
+    default:         cases.push(...genericFormTestCases(pageData));
+  }
+
   cases.push(...universalTestCases(pageData));
+
+  // Filter by selected categories if provided
+  if (categories && categories.length > 0) {
+    const categoryMap = {
+      security:      ["SECURITY"],
+      functional:    ["VALIDATION", "BUSINESS_LOGIC", "CUSTOM"],
+      session:       ["SESSION", "AUTH"],
+      responsive:    ["RESPONSIVE"],
+      performance:   ["PERFORMANCE"],
+      accessibility: ["ACCESSIBILITY"],
+      basic:         ["BASIC", "QUALITY"],
+    };
+
+    const allowed = new Set();
+    categories.forEach(c => {
+      (categoryMap[c.toLowerCase()] || []).forEach(cat => allowed.add(cat));
+    });
+    allowed.add("BASIC"); // Always include basic checks
+    allowed.add("QUALITY");
+    allowed.add("CUSTOM");
+
+    return cases.filter(c => allowed.has(c.category));
+  }
 
   return cases;
 }

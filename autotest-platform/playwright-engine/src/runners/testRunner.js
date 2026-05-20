@@ -10,12 +10,12 @@ if (!fs.existsSync(SCREENSHOT_DIR)) fs.mkdirSync(SCREENSHOT_DIR, { recursive: tr
  * Stage 3 — Executes every test case using Playwright.
  * Acts like a human tester — types, clicks, waits, observes.
  */
-async function runTestCases(baseUrl, testCases, pushProgress) {
+async function runTestCases(baseUrl, testCases, pushProgress, options = {}) {
   const results = [];
 
   for (const testCase of testCases) {
     pushProgress(`Running: "${testCase.name}"...`);
-    const result = await runSingleTest(baseUrl, testCase, pushProgress);
+    const result = await runSingleTest(baseUrl, testCase, pushProgress, options);
     results.push(result);
     pushProgress(`  → ${result.status}: ${result.summary}`);
   }
@@ -23,14 +23,14 @@ async function runTestCases(baseUrl, testCases, pushProgress) {
   return results;
 }
 
-async function runSingleTest(baseUrl, testCase, pushProgress) {
+async function runSingleTest(baseUrl, testCase, pushProgress, options = {}) {
   let browser;
   const startTime = Date.now();
 
   try {
     browser = await chromium.launch({ headless: true });
 
-    // Special case: session/auth route check needs a fresh context with no cookies
+    // Special case: session/auth route check
     if (testCase.actions.some((a) => a.type === "CHECK_AUTH_ROUTE")) {
       return await runAuthRouteCheck(browser, baseUrl, testCase, startTime);
     }
@@ -40,8 +40,8 @@ async function runSingleTest(baseUrl, testCase, pushProgress) {
       return await runPageLevelCheck(browser, baseUrl, testCase, startTime);
     }
 
-    // Standard form interaction test
-    return await runFormTest(browser, baseUrl, testCase, startTime);
+    // Standard form interaction test (Now accepts options for login)
+    return await runFormTest(browser, baseUrl, testCase, startTime, options);
 
   } catch (err) {
     return {
@@ -57,35 +57,52 @@ async function runSingleTest(baseUrl, testCase, pushProgress) {
 }
 
 // ── FORM TEST ───────────────────────────────────────────────────────────────
-async function runFormTest(browser, baseUrl, testCase, startTime) {
+async function runFormTest(browser, baseUrl, testCase, startTime, options = {}) {
+  const { username, password } = options;
   const context = await browser.newContext();
   const page = await context.newPage();
   const consoleErrors = [];
-  page.on("console", (msg) => { if (msg.type() === "error") consoleErrors.push(msg.text()); });
+  
+  page.on("console", (msg) => { 
+    if (msg.type() === "error") consoleErrors.push(msg.text()); 
+  });
 
   await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
   await page.waitForTimeout(1000);
+
+  // --- LOGIN LOGIC ---
+  // If credentials provided and test needs login first, log in
+  if (username && password && testCase.category === "SESSION") {
+    const emailInput = await page.$('input[type="email"], input[name*="email" i], input[name*="user" i]');
+    const passInput = await page.$('input[type="password"]');
+    
+    if (emailInput && passInput) {
+      await emailInput.fill(username);
+      await passInput.fill(password);
+      const submitBtn = await page.$('[type="submit"], button[type="submit"], form button');
+      if (submitBtn) await submitBtn.click();
+      await page.waitForTimeout(2000); // Wait for session to establish
+    }
+  }
 
   const urlBefore = page.url();
 
   // Execute each action in the test case
   for (const action of testCase.actions) {
     await executeAction(page, action);
-    await page.waitForTimeout(800); // Small human-like delay between actions
+    await page.waitForTimeout(800); 
   }
 
-  await page.waitForTimeout(2000); // Wait for response
+  await page.waitForTimeout(2000); 
 
   const urlAfter = page.url();
   const screenshotPath = await takeScreenshot(page, testCase.id);
 
-  // Detect what happened after actions
   const pageText = await page.evaluate(() => document.body.innerText.toLowerCase()).catch(() => "");
   const hasError = detectErrorOnPage(pageText);
   const hasRedirected = urlAfter !== urlBefore;
   const xssExecuted = await page.evaluate(() => typeof window.__xssTest !== "undefined").catch(() => false);
 
-  // Determine pass/fail
   const { status, summary } = evaluateResult(testCase, {
     hasError,
     hasRedirected,
@@ -109,11 +126,9 @@ async function runFormTest(browser, baseUrl, testCase, startTime) {
 
 // ── AUTH ROUTE CHECK ────────────────────────────────────────────────────────
 async function runAuthRouteCheck(browser, baseUrl, testCase, startTime) {
-  // Open a FRESH context — no cookies, no session — simulates a new browser
   const freshContext = await browser.newContext();
   const page = await freshContext.newPage();
 
-  // Try to directly access the URL without logging in
   await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
   await page.waitForTimeout(2000);
 
@@ -145,10 +160,8 @@ async function runAuthRouteCheck(browser, baseUrl, testCase, startTime) {
 async function runPageLevelCheck(browser, baseUrl, testCase, startTime) {
   const context = await browser.newContext();
   const consoleErrors = [];
-
   const action = testCase.actions[0];
 
-  // Mobile viewport check
   if (action.type === "CHECK_MOBILE_VIEWPORT") {
     await context.close();
     const mobileContext = await browser.newContext({ viewport: { width: 375, height: 812 } });
@@ -258,11 +271,9 @@ async function executeAction(page, action) {
         else await page.keyboard.press("Enter");
         break;
       }
-      default:
-        break;
     }
   } catch (err) {
-    // Action failed gracefully — continue
+    // Action failed gracefully
   }
 }
 
@@ -284,41 +295,32 @@ function evaluateResult(testCase, { hasError, hasRedirected, xssExecuted, consol
       return hasError
         ? { status: "PASS", summary: "Validation error correctly displayed" }
         : { status: "FAIL", summary: "No validation error shown — form may accept invalid input" };
-
     case "AUTH_ERROR":
       return hasError
         ? { status: "PASS", summary: "Authentication correctly rejected invalid credentials" }
         : { status: "FAIL", summary: "No auth error shown — potential security issue" };
-
     case "REDIRECT_TO_LOGIN":
       return hasRedirected
         ? { status: "PASS", summary: "Correctly redirected after action" }
         : { status: "WARN", summary: "No redirect detected — check if expected" };
-
     case "NO_SCRIPT_EXECUTION":
       return xssExecuted
         ? { status: "FAIL", summary: "XSS vulnerability detected! Script was executed" }
         : { status: "PASS", summary: "XSS attempt blocked — input is sanitized" };
-
     case "NO_CONSOLE_ERRORS":
       return consoleErrors.length === 0
         ? { status: "PASS", summary: "No console errors detected" }
         : { status: "WARN", summary: `${consoleErrors.length} console error(s) found` };
-
     case "NO_CRASH":
       return { status: "PASS", summary: "Page handled the input without crashing" };
-
     case "HAS_TITLE":
       return { status: "PASS", summary: "Page title check passed" };
-
     case "ANY_RESPONSE":
       return { status: "PASS", summary: "Page responded to the action" };
-
     case "ERROR_MESSAGE":
       return hasError
         ? { status: "PASS", summary: "Error message correctly displayed" }
         : { status: "WARN", summary: "No error message shown — may need to verify manually" };
-
     default:
       return { status: "INFO", summary: "Test completed — manual review recommended" };
   }
