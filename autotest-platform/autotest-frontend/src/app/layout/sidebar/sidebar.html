@@ -1,0 +1,45 @@
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-icon">
+      <i class="ti ti-test-pipe"></i>
+    </div>
+    <div>
+      <div class="logo-name">AutoTest</div>
+      <div class="logo-sub">Testing Platform</div>
+    </div>
+  </div>
+
+  <nav class="nav">
+    @for (group of navItems; track group.section) {
+      <div class="nav-section">{{ group.section }}</div>
+      @for (item of group.items; track item.label) {
+        <a
+          class="nav-item"
+          [routerLink]="item.soon ? null : item.route"
+          [routerLinkActive]="item.soon ? '' : 'active'"
+          [class.soon]="item.soon"
+        >
+          <i class="ti {{ item.icon }}"></i>
+          <span>{{ item.label }}</span>
+          @if (item.badge) {
+            <span class="badge">{{ item.badge }}</span>
+          }
+          @if (item.soon) {
+            <span class="soon-tag">Soon</span>
+          }
+        </a>
+      }
+    }
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="user-row">
+      <div class="avatar">VK</div>
+      <div class="user-info">
+        <div class="user-name">K Vinay</div>
+        <div class="user-plan">Pro plan</div>
+      </div>
+      <i class="ti ti-dots-vertical"></i>
+    </div>
+  </div>
+</aside>

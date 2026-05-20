@@ -1,0 +1,12 @@
+<div class="progress-container">
+  <div class="header">
+    <div class="pulse"></div>
+    <span>Testing in progress...</span>
+  </div>
+  <div class="log-feed">
+    <div class="log-line" *ngFor="let log of logs">
+      <span class="arrow">›</span> {{ log }}
+    </div>
+    <div class="cursor" *ngIf="logs.length > 0">_</div>
+  </div>
+</div>

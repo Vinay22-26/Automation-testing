@@ -1,0 +1,180 @@
+<div class="page">
+  <div class="page-header">
+    <h1>Custom test builder</h1>
+    <p>Tell the platform exactly what to test — step by step</p>
+  </div>
+
+  <!-- Step Indicator -->
+  <div class="stepper">
+    @for (step of steps; track step; let i = $index) {
+      <div class="step" [class.active]="currentStep === i + 1" [class.done]="currentStep > i + 1">
+        <div class="step-circle">
+          @if (currentStep > i + 1) {
+            <i class="ti ti-check"></i>
+          } @else {
+            {{ i + 1 }}
+          }
+        </div>
+        <span class="step-label">{{ step }}</span>
+      </div>
+      @if (i < steps.length - 1) {
+        <div class="step-line" [class.done]="currentStep > i + 1"></div>
+      }
+    }
+  </div>
+
+  <!-- STEP 1: Target URL -->
+  @if (currentStep === 1) {
+    <div class="step-card">
+      <div class="step-title"><i class="ti ti-world"></i> Enter the target URL</div>
+      <div class="step-sub">The URL of the page or application you want to test</div>
+
+      <label class="field-label">URL</label>
+      <input
+        type="url"
+        [(ngModel)]="url"
+        class="field-input large"
+        placeholder="https://yourapp.com/login"
+        (keyup.enter)="nextStep()"
+      />
+
+      <div class="divider"><span>optional credentials for authenticated testing</span></div>
+
+      <div class="cred-row">
+        <div class="field-group">
+          <label class="field-label">Username / Email</label>
+          <input type="text" [(ngModel)]="username" class="field-input" placeholder="admin@company.com" />
+        </div>
+        <div class="field-group">
+          <label class="field-label">Password</label>
+          <input type="password" [(ngModel)]="password" class="field-input" placeholder="••••••••" />
+        </div>
+      </div>
+
+      @if (error) { <p class="error-msg"><i class="ti ti-alert-circle"></i> {{ error }}</p> }
+    </div>
+  }
+
+  <!-- STEP 2: Categories -->
+  @if (currentStep === 2) {
+    <div class="step-card">
+      <div class="step-header-row">
+        <div>
+          <div class="step-title"><i class="ti ti-list-check"></i> Select test categories</div>
+          <div class="step-sub">Choose what aspects to test — {{ selectedCount }} selected</div>
+        </div>
+        <div class="batch-actions">
+          <button class="btn-ghost" (click)="selectAll()">Select all</button>
+          <button class="btn-ghost" (click)="clearAll()">Clear</button>
+        </div>
+      </div>
+
+      <div class="categories-list">
+        @for (cat of categories; track cat.id) {
+          <div class="cat-row" [class.selected]="isSelected(cat.id)">
+            <div class="cat-main" (click)="toggleCategory(cat.id)">
+              <div class="cat-checkbox" [class.checked]="isSelected(cat.id)">
+                @if (isSelected(cat.id)) { <i class="ti ti-check"></i> }
+              </div>
+              <i class="ti {{ cat.icon }} cat-icon"></i>
+              <div class="cat-info">
+                <div class="cat-name">{{ cat.label }}</div>
+                <div class="cat-desc">{{ cat.description }}</div>
+              </div>
+              <button class="expand-btn" (click)="$event.stopPropagation(); toggleExpand(cat.id)">
+                <i class="ti" [class.ti-chevron-down]="expandedCategory !== cat.id" [class.ti-chevron-up]="expandedCategory === cat.id"></i>
+              </button>
+            </div>
+
+            @if (expandedCategory === cat.id) {
+              <div class="cat-detail">
+                <div class="checks-title">What gets tested:</div>
+                <div class="checks-grid">
+                  @for (check of cat.checks; track check) {
+                    <div class="check-item"><i class="ti ti-point-filled"></i> {{ check }}</div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+      @if (error) { <p class="error-msg"><i class="ti ti-alert-circle"></i> {{ error }}</p> }
+    </div>
+  }
+
+  <!-- STEP 3: Configure -->
+  @if (currentStep === 3) {
+    <div class="step-card">
+      <div class="step-title"><i class="ti ti-settings"></i> Configure & review</div>
+      <div class="step-sub">Add specific instructions or review what will be tested</div>
+
+      <label class="field-label">Custom instruction (optional)</label>
+      <textarea
+        [(ngModel)]="customInstruction"
+        class="field-textarea"
+        placeholder="E.g: After login, navigate to the profile page and verify the user's name is displayed. Check that the logout button works and redirects to login page."
+        rows="4"
+      ></textarea>
+      <div class="hint">Describe in plain English what specific scenario you want to test</div>
+
+      <div class="review-section">
+        <div class="review-title">Test summary</div>
+        <div class="review-grid">
+          <div class="review-item">
+            <span class="review-label">URL</span>
+            <span class="review-value">{{ url }}</span>
+          </div>
+          <div class="review-item">
+            <span class="review-label">Auth credentials</span>
+            <span class="review-value">{{ username ? '✅ Provided' : '—  Not provided (anonymous)' }}</span>
+          </div>
+          <div class="review-item">
+            <span class="review-label">Categories selected</span>
+            <span class="review-value">{{ selectedCount }} categories</span>
+          </div>
+          <div class="review-cats">
+            @for (cat of categories; track cat.id) {
+              @if (isSelected(cat.id)) {
+                <span class="cat-pill"><i class="ti {{ cat.icon }}"></i> {{ cat.label }}</span>
+              }
+            }
+          </div>
+        </div>
+      </div>
+      @if (error) { <p class="error-msg"><i class="ti ti-alert-circle"></i> {{ error }}</p> }
+    </div>
+  }
+
+  <!-- STEP 4: Result -->
+  @if (currentStep === 4 && jobId) {
+    <div class="result-wrapper">
+      <button class="back-btn" (click)="resetTest()">
+        <i class="ti ti-arrow-left"></i> New test
+      </button>
+      <app-result [jobId]="jobId" />
+    </div>
+  }
+
+  <!-- Navigation Buttons -->
+  @if (currentStep < 4) {
+    <div class="nav-buttons">
+      @if (currentStep > 1) {
+        <button class="btn-ghost large" (click)="prevStep()">
+          <i class="ti ti-arrow-left"></i> Back
+        </button>
+      }
+      @if (currentStep < 3) {
+        <button class="btn-primary" (click)="nextStep()">
+          Continue <i class="ti ti-arrow-right"></i>
+        </button>
+      }
+      @if (currentStep === 3) {
+        <button class="btn-run" (click)="runTests()" [disabled]="isLoading">
+          <i class="ti ti-rocket"></i>
+          {{ isLoading ? 'Starting tests...' : 'Run ' + selectedCount + ' test categories' }}
+        </button>
+      }
+    </div>
+  }
+</div>

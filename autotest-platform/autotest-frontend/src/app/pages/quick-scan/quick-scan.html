@@ -1,0 +1,75 @@
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>Quick scan</h1>
+      <p>Enter any URL — platform detects page type and tests automatically</p>
+    </div>
+  </div>
+
+  @if (!showResult) {
+    <div class="scan-form">
+      <!-- URL Input -->
+      <div class="form-card">
+        <label class="field-label">Target URL</label>
+        <div class="url-row">
+          <input
+            type="url"
+            [(ngModel)]="url"
+            placeholder="https://yourapp.com/login"
+            class="url-input"
+            (keyup.enter)="startTest()"
+            [disabled]="isLoading"
+          />
+          <button class="btn-run" (click)="startTest()" [disabled]="isLoading">
+            <i class="ti ti-rocket"></i>
+            {{ isLoading ? 'Starting...' : 'Run test' }}
+          </button>
+        </div>
+
+        <div class="divider"><span>optional — provide credentials for authenticated testing</span></div>
+
+        <div class="cred-row">
+          <div class="field-group">
+            <label class="field-label">Username / Email</label>
+            <input type="text" [(ngModel)]="username" placeholder="admin@company.com" class="field-input" />
+          </div>
+          <div class="field-group">
+            <label class="field-label">Password</label>
+            <input type="password" [(ngModel)]="password" placeholder="••••••••" class="field-input" />
+          </div>
+        </div>
+        @if (error) {
+          <p class="error-msg"><i class="ti ti-alert-circle"></i> {{ error }}</p>
+        }
+      </div>
+
+      <!-- Test Categories -->
+      <div class="section-label">Test categories</div>
+      <div class="categories-grid">
+        @for (cat of categories; track cat.id) {
+          <div
+            class="cat-card"
+            [class.selected]="isSelected(cat.id)"
+            (click)="toggleCategory(cat.id)"
+          >
+            <i class="ti {{ cat.icon }} cat-icon"></i>
+            <div class="cat-title">{{ cat.label }}</div>
+            <div class="cat-sub">{{ cat.sub }}</div>
+            @if (isSelected(cat.id)) {
+              <i class="ti ti-check check-mark"></i>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  @if (showResult && jobId) {
+    <div class="result-wrapper">
+      <button class="back-btn" (click)="resetTest()">
+        <i class="ti ti-arrow-left"></i> New test
+      </button>
+      <app-result [jobId]="jobId" />
+    </div>
+  }
+</div>

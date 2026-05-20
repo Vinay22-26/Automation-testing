@@ -1,0 +1,77 @@
+<div class="result-container">
+
+  <!-- Connection status indicator -->
+  <div class="connection-bar" *ngIf="!isComplete">
+    <span class="dot" [class.connected]="connectionStatus"></span>
+    <span>{{ connectionStatus ? 'Connected — receiving live updates' : 'Connecting to test engine...' }}</span>
+  </div>
+
+  <!-- Progress Section -->
+  <div class="progress-section" *ngIf="!isComplete">
+    <app-progress [logs]="progressLogs" />
+  </div>
+
+  <!-- Final Report -->
+  <div class="report-section" *ngIf="isComplete && report">
+
+    <div class="report-header">
+      <button class="back-btn" (click)="goHome()">← Test Another URL</button>
+    </div>
+
+    <!-- Score Card -->
+    <div class="score-card">
+      <div class="score-ring" [class]="report.summary.overallHealth.toLowerCase()">
+        {{ report.summary.score }}
+      </div>
+      <div class="score-info">
+        <h2>{{ report.meta.pageTitle || 'Test Complete' }}</h2>
+        <p>{{ report.meta.url }}</p>
+        <p class="page-type">Page Type: <strong>{{ report.meta.pageType }}</strong></p>
+        <div class="stats">
+          <span class="stat pass">✅ {{ report.summary.passed }} Passed</span>
+          <span class="stat fail">❌ {{ report.summary.failed }} Failed</span>
+          <span class="stat warn">⚠️ {{ report.summary.warned }} Warnings</span>
+          <span class="stat total">📋 {{ report.summary.totalTests }} Total</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Findings -->
+    <div class="findings" *ngIf="report.keyFindings?.length > 0">
+      <h3>Key Findings</h3>
+      <div
+        class="finding"
+        *ngFor="let f of report.keyFindings"
+        [class]="getSeverityClass(f.severity)"
+      >
+        <span class="severity">{{ f.severity }}</span>
+        <span class="msg">{{ f.message }}</span>
+      </div>
+    </div>
+
+    <div class="findings" *ngIf="report.keyFindings?.length === 0">
+      <h3>Key Findings</h3>
+      <div class="finding good">
+        <span class="severity">ALL CLEAR</span>
+        <span class="msg">No critical issues found — all tests passed!</span>
+      </div>
+    </div>
+
+    <!-- All Test Results -->
+    <div class="all-results">
+      <h3>All Test Results</h3>
+      <div
+        class="test-row"
+        *ngFor="let t of report.allResults"
+        [class]="t.status.toLowerCase()"
+      >
+        <span class="icon">{{ getStatusIcon(t.status) }}</span>
+        <div class="test-info">
+          <strong>{{ t.name }}</strong>
+          <span>{{ t.summary }}</span>
+        </div>
+        <span class="category">{{ t.category }}</span>
+      </div>
+    </div>
+  </div>
+</div>

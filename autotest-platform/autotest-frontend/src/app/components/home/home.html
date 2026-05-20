@@ -1,0 +1,33 @@
+<div class="home-container">
+  <div class="hero">
+    <div class="badge">AI-Powered Testing</div>
+    <h1>AutoTest Platform</h1>
+    <p class="subtitle">
+      Enter any website URL — our platform tests it automatically,<br />
+      just like a human QA engineer would.
+    </p>
+
+    <div class="input-wrapper">
+      <input
+        type="url"
+        [(ngModel)]="url"
+        placeholder="https://your-website.com/login"
+        (keyup.enter)="startTest()"
+        [disabled]="isLoading"
+      />
+      <button (click)="startTest()" [disabled]="isLoading">
+        <span *ngIf="!isLoading">Analyse & Test</span>
+        <span *ngIf="isLoading">Starting...</span>
+      </button>
+    </div>
+
+    <p class="error" *ngIf="error">{{ error }}</p>
+
+    <div class="features">
+      <div class="feature">🔍 Auto-detects page type</div>
+      <div class="feature">🤖 Runs like a human tester</div>
+      <div class="feature">🔐 Tests auth & sessions</div>
+      <div class="feature">🛡️ Checks XSS & SQL injection</div>
+    </div>
+  </div>
+</div>
